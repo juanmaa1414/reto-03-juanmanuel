@@ -584,6 +584,11 @@ button {
   color: var(--muted);
 }
 
+.file-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
 .file-download a {
   color: var(--primary-dark);
   background: var(--primary-soft);

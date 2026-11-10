@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -176,6 +176,23 @@ export function createApp(options: AppOptions = {}): Hono {
       numero_oc: row.numero_oc ?? orderNumbers.get(row.solicitud_id) ?? null,
     }));
     return c.json({ ok: true, data: cases });
+  });
+
+  app.get("/api/files/:caso", (c) => {
+    const caso = c.req.param("caso");
+    if (caso.includes("..") || caso.includes("/") || caso.includes("\\")) {
+      return c.json({ ok: false, error: "Nombre de caso inválido." }, 400);
+    }
+    const caseDir = outPath(directory, caso);
+    if (!existsSync(caseDir)) {
+      return c.json({ ok: true, data: { caso, files: [] as string[] } });
+    }
+    const allowed = ["trazabilidad.json", "aprobacion.txt", "aprobacion.pdf"];
+    const available = new Set(readdirSync(caseDir));
+    return c.json({
+      ok: true,
+      data: { caso, files: allowed.filter((file) => available.has(file)) },
+    });
   });
 
   app.get("/api/files/:caso/:filename", (c) => {

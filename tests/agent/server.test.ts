@@ -199,6 +199,17 @@ describe("HTTP API (6.1, 6.2, 6.3)", () => {
     expect(fileResponse.status).toBe(200);
     expect(await fileResponse.text()).toContain("De: mlopez@periferia-ficticia.com");
 
+    const listing = await app.request("/api/files/sol-001");
+    expect(listing.status).toBe(200);
+    const listingBody = (await listing.json()) as { data: { files: string[] } };
+    expect(listingBody.data.files).toContain("aprobacion.txt");
+    expect(listingBody.data.files).toContain("aprobacion.pdf");
+
+    const blockedListing = await app.request("/api/files/sol-002");
+    expect(blockedListing.status).toBe(200);
+    const blockedBody = (await blockedListing.json()) as { data: { files: string[] } };
+    expect(blockedBody.data.files).toEqual([]);
+
     const missing = await app.request("/api/files/sol-001/nope.txt");
     expect(missing.status).toBe(404);
 

@@ -1,18 +1,50 @@
-const CASE_FILES = [
-  { name: "trazabilidad.json", label: "Trazabilidad (JSON)" },
-  { name: "aprobacion.txt", label: "Aprobación (TXT)" },
-  { name: "aprobacion.pdf", label: "Aprobación (PDF)" },
-];
+import { useEffect, useState } from "react";
+import { fetchCaseFiles } from "../api";
+
+const CASE_FILES: Record<string, string> = {
+  "trazabilidad.json": "Trazabilidad (JSON)",
+  "aprobacion.txt": "Aprobación (TXT)",
+  "aprobacion.pdf": "Aprobación (PDF)",
+};
 
 export function FileDownload({ caso }: { caso: string }) {
+  const [files, setFiles] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setFiles(null);
+    void fetchCaseFiles(caso)
+      .then((available) => {
+        if (!cancelled) setFiles(available);
+      })
+      .catch(() => {
+        if (!cancelled) setFiles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [caso]);
+
+  const available = (files ?? []).filter((file) => file in CASE_FILES);
+
   return (
     <section className="file-download" aria-label="Archivos resultado">
       <span className="file-download-title">Archivos de {caso}:</span>
-      {CASE_FILES.map((file) => (
-        <a key={file.name} href={`/api/files/${caso}/${file.name}`} download={file.name}>
-          {file.label}
+
+      {files === null && <span className="file-empty">Cargando archivos…</span>}
+
+      {files !== null && available.length === 0 && (
+        <span className="file-empty">
+          Este caso no generó archivos de resultado (puede estar bloqueado).
+        </span>
+      )}
+
+      {available.map((file) => (
+        <a key={file} href={`/api/files/${caso}/${file}`} download={file}>
+          {CASE_FILES[file]}
         </a>
       ))}
+
       <a href="/api/control.csv" download="control.csv">
         Log de control (CSV)
       </a>

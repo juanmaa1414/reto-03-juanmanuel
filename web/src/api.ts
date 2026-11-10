@@ -100,6 +100,16 @@ export async function fetchCases(): Promise<CaseEntry[]> {
   return payload.ok && Array.isArray(payload.data) ? payload.data : [];
 }
 
+export async function fetchCaseFiles(caso: string): Promise<string[]> {
+  const response = await fetch(`/api/files/${encodeURIComponent(caso)}`);
+  if (!response.ok) return [];
+  const payload = (await response.json()) as {
+    ok: boolean;
+    data?: { files?: string[] };
+  };
+  return payload.ok && Array.isArray(payload.data?.files) ? payload.data.files : [];
+}
+
 export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
   const chat: ChatMessage[] = [];
   for (const message of messages) {
