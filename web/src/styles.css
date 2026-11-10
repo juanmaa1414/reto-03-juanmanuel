@@ -482,10 +482,62 @@ button {
   line-height: 1.5;
 }
 
-.confirmation-card ul {
-  margin: 8px 0;
-  padding-left: 20px;
+.confirmation-card > .markdown-body {
   font-size: 13px;
+}
+
+.confirmation-intro {
+  margin: 4px 0 10px;
+}
+
+.confirmation-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.confirmation-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid #f7d08a;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.confirmation-code {
+  flex-shrink: 0;
+  margin-top: 1px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f79009;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.confirmation-detail {
+  min-width: 0;
+  flex: 1;
+}
+
+.confirmation-detail .markdown-body {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.confirmation-detail .markdown-body p {
+  margin: 0;
+}
+
+.confirmation-question {
+  margin: 10px 0 0;
+  font-weight: 600;
 }
 
 .confirmation-actions {
