@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { fetchSession } from "./api";
 import { CaseSidebar } from "./components/CaseSidebar";
-import { Chat } from "./components/Chat";
+import { Chat, SESSION_STORAGE_KEY } from "./components/Chat";
 import type { SessionData } from "./types";
 
 export function App() {
@@ -9,6 +9,7 @@ export function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeCase, setActiveCase] = useState<string | null>(null);
   const [loadedSession, setLoadedSession] = useState<SessionData | null>(null);
+  const [chatKey, setChatKey] = useState(0);
 
   const openCase = async (sessionId: string | null): Promise<void> => {
     if (!sessionId) return;
@@ -22,6 +23,15 @@ export function App() {
 
   const handleCaseProcessed = (caso: string): void => {
     setActiveCase(caso);
+    setRefreshKey((key) => key + 1);
+  };
+
+  const startNewCase = (): void => {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    setLoadedSession(null);
+    setActiveCase(null);
+    setSidebarOpen(false);
+    setChatKey((key) => key + 1);
     setRefreshKey((key) => key + 1);
   };
 
@@ -43,7 +53,12 @@ export function App() {
             <p>SAP simulado · Periferia IT Group</p>
           </div>
         </div>
-        <span className="model-chip">OpenCode Go · deepseek-v4.1-flash</span>
+        <div className="header-actions">
+          <button type="button" className="new-case-button" onClick={startNewCase}>
+            + Nuevo caso
+          </button>
+          <span className="model-chip">OpenCode Go · deepseek-v4.1-flash</span>
+        </div>
       </header>
 
       <main className="layout">
@@ -65,7 +80,7 @@ export function App() {
         </div>
 
         <Chat
-          key={loadedSession?.id ?? "live"}
+          key={`${loadedSession?.id ?? "live"}-${chatKey}`}
           initialSession={loadedSession}
           onCaseProcessed={handleCaseProcessed}
         />

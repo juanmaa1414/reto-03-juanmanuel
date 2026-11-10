@@ -228,4 +228,71 @@ describe("HTTP API (6.1, 6.2, 6.3)", () => {
     expect(response.status).toBe(503);
     expect(outputExists("log.jsonl")).toBe(false);
   });
+
+  it("blocks processing a different case in a bound session", async () => {
+    const adapter = new ScriptedAdapter([
+      toolResponse("oc_leer_paquete", { caso: "sol-001" }),
+      toolResponse("oc_leer_paquete", { caso: "sol-002" }),
+      textResponse("No puedo procesar otro caso en esta sesión."),
+    ]);
+    const app = makeApp(adapter);
+
+    const response = await app.request("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "case-guard-session",
+        message: "Procesa sol-001",
+        stream: false,
+      }),
+    });
+
+    const body = (await response.json()) as {
+      boundCase: string | null;
+      toolCalls: Array<{ name: string; ok: boolean; result: string }>;
+    };
+    expect(body.boundCase).toBe("sol-001");
+    expect(body.toolCalls).toHaveLength(2);
+    expect(body.toolCalls[1]?.ok).toBe(false);
+    expect(body.toolCalls[1]?.result).toContain("vinculada exclusivamente");
+  });
+
+  it("refuses a second session for a case that already has one", async () => {
+    const adapter = new ScriptedAdapter([
+      toolResponse("oc_leer_paquete", { caso: "sol-001" }),
+      textResponse("Listo."),
+    ]);
+    const app = makeApp(adapter);
+
+    await app.request("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "case-owner-session",
+        message: "Procesa sol-001",
+        stream: false,
+      }),
+    });
+    const callsAfterFirst = adapter.calls.length;
+
+    const second = await app.request("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "case-duplicate-session",
+        message: "Procesa sol-001",
+        stream: false,
+      }),
+    });
+    const body = (await second.json()) as {
+      reply: string;
+      boundCase: string | null;
+      toolCalls: unknown[];
+    };
+
+    expect(body.reply).toContain("Ya existe una sesión para el caso sol-001");
+    expect(body.boundCase).toBeNull();
+    expect(body.toolCalls).toEqual([]);
+    expect(adapter.calls).toHaveLength(callsAfterFirst);
+  });
 });

@@ -148,6 +148,14 @@ curl -X POST http://localhost:3000/api/chat \
   -d '{"message":"Procesa sol-001","stream":false}'
 ```
 
+## Sesiones y casos
+
+- Cada sesión trabaja **un único caso**. El primer caso que se procesa queda fijado para esa sesión.
+- Si necesitas trabajar con otro caso, usa **+ Nuevo caso** en la cabecera. Se abre una sesión nueva.
+- Un caso bloqueado o pendiente se retoma desde su sesión en el panel lateral; no se puede abrir una segunda sesión para el mismo caso.
+- Cuando la OC se crea correctamente, la sesión queda **finalizada**: solo admite preguntas sobre ese caso. No permite volver a procesarlo ni crear otra OC.
+- El panel lateral muestra las sesiones por caso, incluidas las que todavía no llegaron a crear una OC.
+
 ## Docker
 
 ```bash

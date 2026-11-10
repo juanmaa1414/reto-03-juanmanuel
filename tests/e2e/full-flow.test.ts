@@ -97,6 +97,38 @@ describe("end-to-end flow without LLM (9.6)", () => {
     ]);
     expect(body.toolCalls.every((call) => call.ok)).toBe(true);
 
+    const sessionResponse = await app.request("/api/sessions/e2e-sol-001");
+    const sessionBody = (await sessionResponse.json()) as {
+      data: { status: string; metadata: Record<string, unknown> };
+    };
+    expect(sessionBody.data.status).toBe("completed");
+    expect(sessionBody.data.metadata).toMatchObject({
+      caso: "sol-001",
+      solicitud_id: "SOL-2026-001",
+      finalized: true,
+      numero_oc: "4500000001",
+    });
+
+    // A finalized session must not receive tools again, even for questions.
+    const question = await app.request("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "e2e-sol-001",
+        message: "¿Cuál era el total de la solicitud?",
+        stream: false,
+      }),
+    });
+    const questionBody = (await question.json()) as {
+      finalized: boolean;
+      boundCase: string | null;
+      toolCalls: unknown[];
+    };
+    expect(questionBody.finalized).toBe(true);
+    expect(questionBody.boundCase).toBe("sol-001");
+    expect(questionBody.toolCalls).toEqual([]);
+    expect(adapter.calls.at(-1)?.toolNames).toEqual([]);
+
     expect(outputExists("sol-001", "trazabilidad.json")).toBe(true);
     expect(outputExists("sol-001", "aprobacion.txt")).toBe(true);
     expect(outputExists("sol-001", "aprobacion.pdf")).toBe(true);

@@ -18,6 +18,8 @@ function statusLabel(status: string): string {
   if (status === "exitoso") return "Creada";
   if (status === "bloqueado") return "Bloqueada";
   if (status === "pendiente") return "Pendiente";
+  if (status === "finalizada") return "Finalizada";
+  if (status === "en_curso") return "En curso";
   return status;
 }
 
@@ -54,23 +56,68 @@ export function CaseSidebar({
       const requestId = session.metadata?.solicitud_id;
       if (typeof requestId === "string") byRequest.set(requestId, session);
     }
-    return cases.map((entry) => {
-      const session = byRequest.get(entry.solicitud_id) ?? null;
-      const caso = session?.metadata?.caso;
-      return {
-        ...entry,
-        caso: typeof caso === "string" ? caso : null,
-        sessionId: session?.id ?? null,
-      };
-    });
+
+    const representedRequests = new Set<string>();
+    const sessionEntries: SidebarEntry[] = [];
+
+    for (const session of sessions) {
+      const casoRaw = session.metadata?.caso;
+      if (typeof casoRaw !== "string" || casoRaw.length === 0) continue;
+
+      const requestId =
+        typeof session.metadata?.solicitud_id === "string"
+          ? session.metadata.solicitud_id
+          : null;
+      if (requestId) representedRequests.add(requestId);
+
+      const caseRow = requestId
+        ? cases.find((entry) => entry.solicitud_id === requestId)
+        : undefined;
+      const metadataOrder = session.metadata?.numero_oc;
+      const resultado =
+        caseRow?.resultado ??
+        (session.status === "completed"
+          ? "finalizada"
+          : session.status === "paused"
+            ? "pendiente"
+            : "en_curso");
+
+      sessionEntries.push({
+        solicitud_id: requestId ?? casoRaw,
+        resultado,
+        numero_oc:
+          caseRow?.numero_oc ??
+          (typeof metadataOrder === "string" ? metadataOrder : null),
+        retroactiva: caseRow?.retroactiva ?? false,
+        bloqueos: caseRow?.bloqueos ?? [],
+        confirmaciones: caseRow?.confirmaciones ?? [],
+        ts: caseRow?.ts ?? session.updatedAt,
+        caso: casoRaw,
+        sessionId: session.id,
+      });
+    }
+
+    const legacyEntries: SidebarEntry[] = cases
+      .filter((entry) => !representedRequests.has(entry.solicitud_id))
+      .map((entry) => {
+        const session = byRequest.get(entry.solicitud_id) ?? null;
+        const caso = session?.metadata?.caso;
+        return {
+          ...entry,
+          caso: typeof caso === "string" ? caso : null,
+          sessionId: session?.id ?? null,
+        };
+      });
+
+    return [...sessionEntries, ...legacyEntries].sort((a, b) => b.ts.localeCompare(a.ts));
   }, [cases, sessions]);
 
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <div>
-          <h2>Casos procesados</h2>
-          <p>{entries.length} registro(s) en el log de control</p>
+          <h2>Casos y sesiones</h2>
+          <p>{entries.length} caso(s) con actividad</p>
         </div>
         <button type="button" className="sidebar-close" onClick={onClose} aria-label="Cerrar menú">
           ×
@@ -80,7 +127,7 @@ export function CaseSidebar({
       {loading && <p className="sidebar-empty">Cargando casos…</p>}
       {!loading && entries.length === 0 && (
         <p className="sidebar-empty">
-          Aún no hay casos procesados. Prueba con <strong>sol-001</strong>.
+          Aún no hay casos con sesión. Usa <strong>+ Nuevo caso</strong> para empezar.
         </p>
       )}
 

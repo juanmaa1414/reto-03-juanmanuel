@@ -4,7 +4,13 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { SessionStore } from "./agent/sessions.js";
-import { runAgentLoop, parseToolResult, type AgentLoopResult } from "./agent/loop.js";
+import {
+  runAgentLoop,
+  parseToolResult,
+  type AgentLoopResult,
+  type ToolCallLog,
+  type ToolGuard,
+} from "./agent/loop.js";
 import { createOpenCodeGoAdapter } from "./llm/opencode.js";
 import type { LLMAdapter } from "./llm/adapter.js";
 import { tools as defaultTools } from "./tools/oc.js";
@@ -39,10 +45,20 @@ type CaseRow = {
   ts: string;
 };
 
+type SessionCaseState = {
+  boundCase: string | null;
+  finalized: boolean;
+  numeroOc: string | null;
+};
+
+const CASE_MENTION = /\bsol-\d{3}\b/gi;
+
 export function loadSystemPrompt(directory: string): string {
   const path = resolve(directory, "agent/prompt.md");
   if (!existsSync(path)) {
-    throw new Error("Falta agent/prompt.md: el system prompt debe vivir en un archivo, no en el código.");
+    throw new Error(
+      "Falta agent/prompt.md: el system prompt debe vivir en un archivo, no en el código.",
+    );
   }
   return readFileSync(path, "utf8");
 }
@@ -105,6 +121,48 @@ function fileContentType(fileName: string): string {
   return "text/plain; charset=utf-8";
 }
 
+function readSessionCaseState(session: StoredSession): SessionCaseState {
+  const caso = session.metadata?.caso;
+  const numeroOc = session.metadata?.numero_oc;
+  return {
+    boundCase: typeof caso === "string" && caso.length > 0 ? caso : null,
+    finalized:
+      session.status === "completed" || session.metadata?.finalized === true,
+    numeroOc: typeof numeroOc === "string" && numeroOc.length > 0 ? numeroOc : null,
+  };
+}
+
+function detectCaseMentions(message: string): string[] {
+  const matches = message.match(CASE_MENTION) ?? [];
+  return [...new Set(matches.map((match) => match.toLowerCase()))];
+}
+
+function runtimeSystemPrompt(base: string, state: SessionCaseState): string {
+  const lines = [base, "", "## Contexto de esta sesión"];
+
+  if (state.boundCase) {
+    lines.push(
+      `- Esta sesión está vinculada exclusivamente al caso ${state.boundCase}. No proceses ningún otro caso.`,
+    );
+  } else {
+    lines.push(
+      "- Esta sesión todavía no tiene un caso asignado. El primer caso que proceses quedará fijado para toda la sesión.",
+    );
+  }
+
+  if (state.finalized) {
+    lines.push(
+      `- El caso ${state.boundCase ?? ""} ya fue finalizado${state.numeroOc ? ` con la OC ${state.numeroOc}` : ""}. Solo responde preguntas sobre este caso. No vuelvas a procesarlo, a generar evidencia ni a crear otra OC.`,
+    );
+  } else if (state.boundCase) {
+    lines.push(
+      "- Si el caso está bloqueado o pendiente, cualquier corrección debe hacerse volviendo a esta misma sesión. Si el usuario pide otro caso, indícale que abra su sesión o que inicie un nuevo caso.",
+    );
+  }
+
+  return lines.join("\n");
+}
+
 /** Collect case identifiers from the tool calls so the sidebar can link them. */
 function sessionMetadata(result: AgentLoopResult): Record<string, unknown> {
   let caso: string | null = null;
@@ -121,6 +179,34 @@ function sessionMetadata(result: AgentLoopResult): Record<string, unknown> {
     ...(caso ? { caso } : {}),
     ...(solicitudId ? { solicitud_id: solicitudId } : {}),
   };
+}
+
+function extractFinalization(
+  result: AgentLoopResult,
+  state: SessionCaseState,
+): { finalized: boolean; numeroOc: string | null } {
+  let finalized = state.finalized;
+  let numeroOc = state.numeroOc;
+  for (const log of result.toolCalls) {
+    if (log.name !== "oc_crear" || !log.ok) continue;
+    const parsed = parseToolResult(log.result);
+    if (!parsed?.ok) continue;
+    finalized = true;
+    const data = parsed.data as { numero_oc?: string };
+    if (typeof data.numero_oc === "string") numeroOc = data.numero_oc;
+  }
+  return { finalized, numeroOc };
+}
+
+function nextSessionStatus(
+  finalized: boolean,
+  needsConfirmation: boolean,
+  previous: StoredSession["status"],
+): StoredSession["status"] {
+  if (finalized) return "completed";
+  if (needsConfirmation) return "paused";
+  if (previous === "paused") return "paused";
+  return "active";
 }
 
 export function createApp(options: AppOptions = {}): Hono {
@@ -171,11 +257,20 @@ export function createApp(options: AppOptions = {}): Hono {
       }
     }
 
-    const cases = readControlRows(directory).map((row) => ({
-      ...row,
-      numero_oc: row.numero_oc ?? orderNumbers.get(row.solicitud_id) ?? null,
-    }));
-    return c.json({ ok: true, data: cases });
+    // A case can have several attempts in control.csv (blocked, pending, successful).
+    // The sidebar only needs its latest state.
+    const latestByRequest = new Map<string, CaseRow>();
+    for (const row of readControlRows(directory)) {
+      const enriched = {
+        ...row,
+        numero_oc: row.numero_oc ?? orderNumbers.get(row.solicitud_id) ?? null,
+      };
+      const previous = latestByRequest.get(row.solicitud_id);
+      if (!previous || row.ts >= previous.ts) {
+        latestByRequest.set(row.solicitud_id, enriched);
+      }
+    }
+    return c.json({ ok: true, data: [...latestByRequest.values()] });
   });
 
   app.get("/api/files/:caso", (c) => {
@@ -254,6 +349,103 @@ export function createApp(options: AppOptions = {}): Hono {
       return c.json({ ok: false, error: "El campo 'message' es obligatorio." }, 400);
     }
 
+    const session = sessionStore.getOrCreate(body.sessionId);
+    const state = readSessionCaseState(session);
+    const accept = c.req.header("accept") ?? "";
+    const wantsStream = body.stream !== false && accept.includes("text/event-stream");
+
+    let messages = [...session.messages, { role: "user" as const, content: body.message }];
+    sessionStore.save({ ...session, messages });
+
+    const replyWith = (
+      reply: string,
+      currentState: SessionCaseState,
+      status: StoredSession["status"],
+    ): Response => {
+      const latest = sessionStore.get(session.id) ?? session;
+      const saved = sessionStore.save({
+        ...latest,
+        messages: [...messages, { role: "assistant", content: reply }],
+        metadata: {
+          ...latest.metadata,
+          ...(currentState.boundCase ? { caso: currentState.boundCase } : {}),
+          ...(currentState.finalized ? { finalized: true } : {}),
+          ...(currentState.numeroOc ? { numero_oc: currentState.numeroOc } : {}),
+        },
+        status,
+      });
+      const payload = {
+        sessionId: saved.id,
+        reply,
+        toolCalls: [] as unknown[],
+        needsConfirmation: false,
+        confirmation: { needsConfirmation: false, message: "", pending: [] },
+        boundCase: currentState.boundCase,
+        finalized: currentState.finalized,
+        numeroOc: currentState.numeroOc,
+        sessionStatus: saved.status,
+      };
+      if (!wantsStream) return c.json({ ok: true, ...payload });
+      return streamSSE(c, async (stream) => {
+        await stream.writeSSE({
+          event: "session",
+          data: JSON.stringify({ sessionId: saved.id }),
+        });
+        await stream.writeSSE({
+          event: "token",
+          data: JSON.stringify({ delta: reply }),
+        });
+        await stream.writeSSE({ event: "done", data: JSON.stringify(payload) });
+      }) as unknown as Response;
+    };
+
+    // Deterministic guards for session/case ownership.
+    const mentions = detectCaseMentions(body.message);
+    if (mentions.length > 1) {
+      return replyWith(
+        "Cada sesión trabaja un único caso. Inicia una sesión diferente para cada caso.",
+        state,
+        session.status,
+      );
+    }
+
+    if (mentions.length === 1) {
+      const caso = mentions[0] as string;
+
+      if (state.finalized && state.boundCase && caso !== state.boundCase) {
+        return replyWith(
+          `Esta sesión está finalizada para el caso ${state.boundCase}. Solo puedes hacer preguntas sobre ese caso. Para trabajar con ${caso}, abre su sesión desde el panel lateral.`,
+          state,
+          "completed",
+        );
+      }
+
+      if (state.boundCase && caso !== state.boundCase) {
+        return replyWith(
+          `Esta sesión está vinculada exclusivamente al caso ${state.boundCase}. Para trabajar con ${caso}, abre su sesión desde el panel lateral o inicia un nuevo caso.`,
+          state,
+          session.status,
+        );
+      }
+
+      if (!state.boundCase) {
+        const existing = sessionStore.findByCase(caso);
+        if (existing && existing.id !== session.id) {
+          return replyWith(
+            `Ya existe una sesión para el caso ${caso}. Ábrela desde el panel lateral para continuar trabajando en ese caso.`,
+            state,
+            session.status,
+          );
+        }
+        state.boundCase = caso;
+        const latest = sessionStore.get(session.id) ?? session;
+        sessionStore.save({
+          ...latest,
+          metadata: { ...latest.metadata, caso },
+        });
+      }
+    }
+
     const adapter = resolveAdapter();
     if (!adapter) {
       return c.json(
@@ -266,28 +458,89 @@ export function createApp(options: AppOptions = {}): Hono {
       );
     }
 
-    const session = sessionStore.getOrCreate(body.sessionId);
-    const messages = [...session.messages, { role: "user" as const, content: body.message }];
-    sessionStore.save({ ...session, messages });
+    const guard: ToolGuard = (call) => {
+      if (state.finalized) {
+        return {
+          allow: false,
+          error:
+            "La sesión está finalizada. Solo puedes responder preguntas sobre este caso; no se permite volver a procesarlo.",
+        };
+      }
 
-    const accept = c.req.header("accept") ?? "";
-    const wantsStream = body.stream !== false && accept.includes("text/event-stream");
+      const caso = call.arguments.caso;
+      if (typeof caso !== "string" || caso.length === 0) return { allow: true };
+
+      if (state.boundCase && caso !== state.boundCase) {
+        return {
+          allow: false,
+          error: `Esta sesión está vinculada exclusivamente al caso ${state.boundCase}. Para procesar ${caso}, abre su sesión desde el panel lateral o inicia un nuevo caso.`,
+        };
+      }
+
+      if (!state.boundCase) {
+        const existing = sessionStore.findByCase(caso);
+        if (existing && existing.id !== session.id) {
+          return {
+            allow: false,
+            error: `Ya existe una sesión para el caso ${caso}. Ábrela desde el panel lateral para continuar trabajando en ese caso.`,
+          };
+        }
+        state.boundCase = caso;
+        const latest = sessionStore.get(session.id) ?? session;
+        sessionStore.save({
+          ...latest,
+          metadata: { ...latest.metadata, caso },
+        });
+      }
+
+      return { allow: true };
+    };
+
+    const effectiveTools: ToolRegistry = state.finalized ? {} : toolRegistry;
+    const effectivePrompt = runtimeSystemPrompt(systemPrompt, state);
+
+    const onToolResult = (log: ToolCallLog): void => {
+      if (log.name !== "oc_crear" || !log.ok) return;
+      const parsed = parseToolResult(log.result);
+      if (!parsed?.ok) return;
+      state.finalized = true;
+      const data = parsed.data as { numero_oc?: string };
+      if (typeof data.numero_oc === "string") state.numeroOc = data.numero_oc;
+    };
 
     if (!wantsStream) {
       const result = await runAgentLoop({
         adapter,
-        tools: toolRegistry,
+        tools: effectiveTools,
         messages,
-        systemPrompt,
+        systemPrompt: effectivePrompt,
         context: { directory, sessionId: session.id },
         maxIterations: config.maxIterations,
         maxTokensPerSession: config.maxTokensPerSession,
+        beforeToolCall: guard,
+        onToolResult,
       });
+      const finalization = extractFinalization(result, state);
+      const latest = sessionStore.get(session.id) ?? session;
       const saved: StoredSession = sessionStore.save({
-        ...session,
+        ...latest,
         messages: result.messages,
-        metadata: { ...session.metadata, ...sessionMetadata(result) },
-        status: result.needsConfirmation ? "paused" : "active",
+        metadata: {
+          ...latest.metadata,
+          ...sessionMetadata(result),
+          ...(state.boundCase ? { caso: state.boundCase } : {}),
+          ...(finalization.finalized ? { finalized: true } : {}),
+          ...(finalization.numeroOc ? { numero_oc: finalization.numeroOc } : {}),
+        },
+        status: finalization.finalized
+          ? "completed"
+          : result.needsConfirmation
+            ? "paused"
+            : nextSessionStatus(
+                finalization.finalized,
+                result.needsConfirmation,
+                session.status,
+              ),
       });
       return c.json({
         ok: true,
@@ -296,6 +549,10 @@ export function createApp(options: AppOptions = {}): Hono {
         toolCalls: result.toolCalls,
         needsConfirmation: result.needsConfirmation,
         confirmation: result.confirmation,
+        boundCase: state.boundCase,
+        finalized: finalization.finalized,
+        numeroOc: finalization.numeroOc,
+        sessionStatus: saved.status,
       });
     }
 
@@ -311,12 +568,14 @@ export function createApp(options: AppOptions = {}): Hono {
 
       const result = await runAgentLoop({
         adapter,
-        tools: toolRegistry,
+        tools: effectiveTools,
         messages,
-        systemPrompt,
+        systemPrompt: effectivePrompt,
         context: { directory, sessionId: session.id },
         maxIterations: config.maxIterations,
         maxTokensPerSession: config.maxTokensPerSession,
+        beforeToolCall: guard,
+        onToolResult,
         onEvent: (event) => {
           if (event.type === "text") send("token", { delta: event.delta });
           else if (event.type === "tool_start")
@@ -335,11 +594,27 @@ export function createApp(options: AppOptions = {}): Hono {
         },
       });
 
+      const finalization = extractFinalization(result, state);
+      const latest = sessionStore.get(session.id) ?? session;
       const saved = sessionStore.save({
-        ...session,
+        ...latest,
         messages: result.messages,
-        metadata: { ...session.metadata, ...sessionMetadata(result) },
-        status: result.needsConfirmation ? "paused" : "active",
+        metadata: {
+          ...latest.metadata,
+          ...sessionMetadata(result),
+          ...(state.boundCase ? { caso: state.boundCase } : {}),
+          ...(finalization.finalized ? { finalized: true } : {}),
+          ...(finalization.numeroOc ? { numero_oc: finalization.numeroOc } : {}),
+        },
+        status: finalization.finalized
+          ? "completed"
+          : result.needsConfirmation
+            ? "paused"
+            : nextSessionStatus(
+                finalization.finalized,
+                result.needsConfirmation,
+                session.status,
+              ),
       });
 
       send("done", {
@@ -348,6 +623,10 @@ export function createApp(options: AppOptions = {}): Hono {
         toolCalls: result.toolCalls,
         needsConfirmation: result.needsConfirmation,
         confirmation: result.confirmation,
+        boundCase: state.boundCase,
+        finalized: finalization.finalized,
+        numeroOc: finalization.numeroOc,
+        sessionStatus: saved.status,
       });
 
       await queue;

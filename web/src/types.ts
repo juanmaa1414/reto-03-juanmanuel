@@ -59,4 +59,8 @@ export type DonePayload = {
   }>;
   needsConfirmation: boolean;
   confirmation: ConfirmationState;
+  boundCase: string | null;
+  finalized: boolean;
+  numeroOc: string | null;
+  sessionStatus: "active" | "completed" | "paused";
 };

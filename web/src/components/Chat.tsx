@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   extractCase,
   fetchSession,
+  fetchSessions,
   streamChat,
   toChatMessages,
 } from "../api";
@@ -16,7 +17,29 @@ import { Confirmation } from "./Confirmation";
 import { FileDownload } from "./FileDownload";
 import { Markdown } from "./Markdown";
 
-const SESSION_KEY = "agente-oc-sap-session-id";
+export const SESSION_STORAGE_KEY = "agente-oc-sap-session-id";
+
+const ALL_CASES = ["sol-001", "sol-002", "sol-003", "sol-004", "sol-005", "sol-006"];
+
+type SessionState = {
+  boundCase: string | null;
+  finalized: boolean;
+  numeroOc: string | null;
+};
+
+function stateFromSession(session: SessionData, messages: ChatMessage[]): SessionState {
+  const caso = session.metadata?.caso;
+  const numeroOc = session.metadata?.numero_oc;
+  return {
+    boundCase:
+      (typeof caso === "string" && caso.length > 0 ? caso : null) ??
+      extractCase(messages),
+    finalized:
+      session.status === "completed" || session.metadata?.finalized === true,
+    numeroOc:
+      typeof numeroOc === "string" && numeroOc.length > 0 ? numeroOc : null,
+  };
+}
 
 type ChatProps = {
   initialSession: SessionData | null;
@@ -59,48 +82,72 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
   const [error, setError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
   const [currentCase, setCurrentCase] = useState<string | null>(null);
+  const [boundCase, setBoundCase] = useState<string | null>(null);
+  const [finalized, setFinalized] = useState(false);
+  const [numeroOc, setNumeroOc] = useState<string | null>(null);
+  const [availableCases, setAvailableCases] = useState<string[]>(ALL_CASES);
   const bottomRef = useRef<HTMLDivElement>(null);
   const caseRef = useRef<string | null>(null);
+
+  const applySession = (session: SessionData): void => {
+    const chatMessages = toChatMessages(session.messages);
+    const state = stateFromSession(session, chatMessages);
+    setSessionId(session.id);
+    setMessages(chatMessages);
+    setCurrentCase(state.boundCase);
+    setBoundCase(state.boundCase);
+    setFinalized(state.finalized);
+    setNumeroOc(state.numeroOc);
+    caseRef.current = state.boundCase;
+    setConfirmation(
+      session.status === "paused" && !state.finalized
+        ? {
+            needsConfirmation: true,
+            message:
+              [...chatMessages].reverse().find((message) => message.role === "assistant")
+                ?.content ?? "La sesión quedó pendiente de confirmación.",
+            pending: [],
+          }
+        : null,
+    );
+    localStorage.setItem(SESSION_STORAGE_KEY, session.id);
+  };
 
   useEffect(() => {
     let cancelled = false;
 
     if (initialSession) {
-      const chatMessages = toChatMessages(initialSession.messages);
-      const caso = extractCase(chatMessages);
-      setSessionId(initialSession.id);
-      setMessages(chatMessages);
-      setCurrentCase(caso);
-      caseRef.current = caso;
-      setConfirmation(
-        initialSession.status === "paused"
-          ? {
-              needsConfirmation: true,
-              message:
-                [...chatMessages].reverse().find((message) => message.role === "assistant")
-                  ?.content ?? "La sesión quedó pendiente de confirmación.",
-              pending: [],
-            }
-          : null,
-      );
+      applySession(initialSession);
       return () => {
         cancelled = true;
       };
     }
 
-    const stored = localStorage.getItem(SESSION_KEY);
+    const stored = localStorage.getItem(SESSION_STORAGE_KEY);
     if (stored) {
       void fetchSession(stored).then((session) => {
         if (cancelled || !session) return;
-        const chatMessages = toChatMessages(session.messages);
-        setSessionId(session.id);
-        setMessages(chatMessages);
-        const caso = extractCase(chatMessages);
-        setCurrentCase(caso);
-        caseRef.current = caso;
+        applySession(session);
       });
     }
 
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSession]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSessions().then((sessions) => {
+      if (cancelled) return;
+      const taken = new Set(
+        sessions
+          .map((session) => session.metadata?.caso)
+          .filter((caso): caso is string => typeof caso === "string"),
+      );
+      setAvailableCases(ALL_CASES.filter((caso) => !taken.has(caso)));
+    });
     return () => {
       cancelled = true;
     };
@@ -133,7 +180,7 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
           const payload = data as { sessionId: string };
           activeSession = payload.sessionId;
           setSessionId(payload.sessionId);
-          localStorage.setItem(SESSION_KEY, payload.sessionId);
+          localStorage.setItem(SESSION_STORAGE_KEY, payload.sessionId);
           return;
         }
 
@@ -246,13 +293,25 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
           );
           activeSession = payload.sessionId;
           setSessionId(payload.sessionId);
-          localStorage.setItem(SESSION_KEY, payload.sessionId);
-          setConfirmation(payload.needsConfirmation ? payload.confirmation : null);
+          localStorage.setItem(SESSION_STORAGE_KEY, payload.sessionId);
 
           const doneCase =
+            payload.boundCase ??
             payload.toolCalls
               .map((call) => call.arguments.caso)
-              .find((caso): caso is string => typeof caso === "string") ?? caseRef.current;
+              .find((caso): caso is string => typeof caso === "string") ??
+            caseRef.current;
+
+          setBoundCase(doneCase);
+          setFinalized(payload.finalized);
+          setNumeroOc(payload.numeroOc);
+          setConfirmation((previous) => {
+            if (payload.finalized) return null;
+            if (payload.needsConfirmation) return payload.confirmation;
+            if (payload.sessionStatus === "paused") return previous;
+            return null;
+          });
+
           if (doneCase) {
             caseRef.current = doneCase;
             setCurrentCase(doneCase);
@@ -290,23 +349,58 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
 
   return (
     <section className="chat-panel">
+      {boundCase && (
+        <div className={`case-context ${finalized ? "finalized" : ""}`}>
+          <span className="case-context-badge">
+            {finalized ? "Caso finalizado" : "Sesión exclusiva"}
+          </span>
+          <strong>{boundCase}</strong>
+          {numeroOc && <span className="case-context-oc">OC {numeroOc}</span>}
+          <span className="case-context-note">
+            {finalized
+              ? "Solo puedes hacer preguntas sobre este caso."
+              : "No puedes procesar otro caso en esta sesión."}
+          </span>
+        </div>
+      )}
+
       <div className="chat-messages">
-        {messages.length === 0 && (
-          <div className="empty-state">
-            <h2>Agente de órdenes de compra SAP</h2>
-            <p>
-              Pídele que procese un caso. El agente lee el paquete, valida contra los
-              maestros, arma la OC y pide confirmación cuando hace falta.
-            </p>
-            <div className="suggestions">
-              {["sol-001", "sol-002", "sol-004", "sol-005"].map((caso) => (
-                <button key={caso} type="button" onClick={() => void send(`Procesa ${caso}`)}>
-                  Procesa {caso}
-                </button>
-              ))}
+        {messages.length === 0 &&
+          (boundCase ? (
+            <div className="empty-state">
+              <h2>Sesión vinculada a {boundCase}</h2>
+              <p>
+                Esta sesión ya está reservada para ese caso. Puedes continuar el
+                trabajo pendiente o hacer preguntas sobre él.
+              </p>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="empty-state">
+              <h2>Agente de órdenes de compra SAP</h2>
+              <p>
+                Cada sesión trabaja un único caso. Elige uno para comenzar; si ya
+                tiene sesión, ábrela desde el panel de casos.
+              </p>
+              {availableCases.length > 0 ? (
+                <div className="suggestions">
+                  {availableCases.map((caso) => (
+                    <button
+                      key={caso}
+                      type="button"
+                      onClick={() => void send(`Procesa ${caso}`)}
+                    >
+                      Procesa {caso}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="suggestion-empty">
+                  Todos los casos ya tienen una sesión abierta. Ábrela desde el
+                  panel de casos para continuar o consultar.
+                </p>
+              )}
+            </div>
+          ))}
 
         {messages.map((message) => (
           <article key={message.id} className={`message message-${message.role}`}>
@@ -355,7 +449,9 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
         />
       )}
 
-      {currentCase && <FileDownload caso={currentCase} />}
+      {(boundCase || currentCase) && (
+        <FileDownload caso={(boundCase ?? currentCase) as string} />
+      )}
 
       <form className="chat-input" onSubmit={handleSubmit}>
         <textarea
@@ -368,9 +464,13 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
             }
           }}
           placeholder={
-            confirmation?.needsConfirmation
-              ? "Escribe 'confirmo' o usa los botones de arriba…"
-              : "Ej.: Procesa la solicitud sol-004 y muéstrame la OC antes de crearla"
+            finalized
+              ? "Haz una pregunta sobre este caso…"
+              : confirmation?.needsConfirmation
+                ? "Escribe 'confirmo' o usa los botones de arriba…"
+                : boundCase
+                  ? "Continúa este caso o escribe una consulta…"
+                  : "Ej.: Procesa la solicitud sol-004 y muéstrame la OC antes de crearla"
           }
           rows={2}
           disabled={busy}

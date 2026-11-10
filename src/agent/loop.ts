@@ -36,6 +36,10 @@ export type ToolCallLog = {
   durationMs: number;
 };
 
+export type ToolGuardResult = { allow: true } | { allow: false; error: string };
+
+export type ToolGuard = (call: ToolCall) => ToolGuardResult | Promise<ToolGuardResult>;
+
 export type AgentLoopOptions = {
   adapter: LLMAdapter;
   tools: ToolRegistry;
@@ -45,6 +49,10 @@ export type AgentLoopOptions = {
   maxIterations?: number;
   maxTokensPerSession?: number;
   onEvent?: (event: AgentEvent) => void;
+  /** Optional policy hook executed before every tool call. */
+  beforeToolCall?: ToolGuard;
+  /** Called after each tool execution, including blocked calls. */
+  onToolResult?: (log: ToolCallLog) => void | Promise<void>;
 };
 
 export type AgentLoopResult = {
@@ -107,6 +115,8 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     maxIterations = 25,
     maxTokensPerSession = 500_000,
     onEvent,
+    beforeToolCall,
+    onToolResult,
   } = options;
 
   const emit = (event: AgentEvent): void => onEvent?.(event);
@@ -183,9 +193,12 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
         emit({ type: "tool_start", name: call.name, arguments: call.arguments });
         const started = Date.now();
         const definition = tools[call.name];
+        const guard = beforeToolCall ? await beforeToolCall(call) : { allow: true as const };
         let rawResult: string;
 
-        if (!definition) {
+        if (!guard.allow) {
+          rawResult = JSON.stringify({ ok: false, error: guard.error });
+        } else if (!definition) {
           rawResult = JSON.stringify({
             ok: false,
             error: `Herramienta desconocida: ${call.name}`,
@@ -235,6 +248,13 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
         toolName: result.call.name,
       });
       logs.push({
+        name: result.call.name,
+        arguments: result.call.arguments,
+        result: result.rawResult,
+        ok: result.ok,
+        durationMs: result.durationMs,
+      });
+      await onToolResult?.({
         name: result.call.name,
         arguments: result.call.arguments,
         result: result.rawResult,

@@ -130,6 +130,18 @@ export class SessionStore {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
+  /** Find the session bound to a case folder (e.g. sol-001). */
+  findByCase(caso: string): StoredSession | null {
+    return this.list().find((session) => session.metadata?.caso === caso) ?? null;
+  }
+
+  /** Find the session bound to a purchase request id (e.g. SOL-2026-001). */
+  findByRequestId(solicitudId: string): StoredSession | null {
+    return (
+      this.list().find((session) => session.metadata?.solicitud_id === solicitudId) ?? null
+    );
+  }
+
   delete(id: string): void {
     const path = this.filePath(id);
     if (existsSync(path)) rmSync(path);

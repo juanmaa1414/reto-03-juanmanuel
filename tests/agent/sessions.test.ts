@@ -66,4 +66,17 @@ describe("file-based sessions (5.5)", () => {
     store.create("survivor");
     expect(existsSync(outPath("sessions", "survivor.json"))).toBe(true);
   });
+
+  it("finds the session bound to a case or request id", () => {
+    const store = new SessionStore(testContext.directory);
+    store.create("case-session");
+    store.update("case-session", {
+      metadata: { caso: "sol-001", solicitud_id: "SOL-2026-001" },
+    });
+
+    expect(store.findByCase("sol-001")?.id).toBe("case-session");
+    expect(store.findByCase("sol-002")).toBeNull();
+    expect(store.findByRequestId("SOL-2026-001")?.id).toBe("case-session");
+    expect(store.findByRequestId("SOL-2026-002")).toBeNull();
+  });
 });
