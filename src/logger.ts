@@ -4,9 +4,10 @@ import { ensureParentDirectory, summarize } from "./util.js";
 
 /** Remove configured secrets from any string before logging or returning it. */
 export function redactSecrets(value: string): string {
-  const secret = process.env.DEEPSEEK_API_KEY;
-  if (!secret || secret.length < 4) return value;
-  return value.split(secret).join("[REDACTED]");
+  const secrets = [process.env.OPENCODE_API_KEY, process.env.DEEPSEEK_API_KEY].filter(
+    (secret): secret is string => typeof secret === "string" && secret.length >= 4,
+  );
+  return secrets.reduce((result, secret) => result.split(secret).join("[REDACTED]"), value);
 }
 
 export function appendJsonLine(

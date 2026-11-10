@@ -5,7 +5,7 @@ import { streamSSE } from "hono/streaming";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { SessionStore } from "./agent/sessions.js";
 import { runAgentLoop, parseToolResult, type AgentLoopResult } from "./agent/loop.js";
-import { createDeepSeekAdapter } from "./llm/deepseek.js";
+import { createOpenCodeGoAdapter } from "./llm/opencode.js";
 import type { LLMAdapter } from "./llm/adapter.js";
 import { tools as defaultTools } from "./tools/oc.js";
 import type { ToolRegistry } from "./tools/contract.js";
@@ -135,15 +135,15 @@ export function createApp(options: AppOptions = {}): Hono {
 
   const resolveAdapter = (): LLMAdapter | null => {
     if (options.adapter) return options.adapter;
-    if (!config.deepseekApiKey) return null;
-    return createDeepSeekAdapter({
-      apiKey: config.deepseekApiKey,
+    if (!config.opencodeApiKey) return null;
+    return createOpenCodeGoAdapter({
+      apiKey: config.opencodeApiKey,
       modelId: config.modelId,
     });
   };
 
   app.get("/api/health", (c) =>
-    c.json({ ok: true, provider: "deepseek", model: config.modelId }),
+    c.json({ ok: true, provider: "opencode-go", model: config.modelId }),
   );
 
   app.get("/api/sessions/:id", (c) => {
@@ -243,7 +243,7 @@ export function createApp(options: AppOptions = {}): Hono {
         {
           ok: false,
           error:
-            "DEEPSEEK_API_KEY no está configurada en el backend. Configurala en .env para usar el chat; el demo y los tests no la necesitan.",
+            "OPENCODE_API_KEY no está configurada en el backend. Configurala en .env para usar el chat; el demo y los tests no la necesitan.",
         },
         503,
       );

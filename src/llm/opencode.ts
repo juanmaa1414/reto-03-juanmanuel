@@ -1,4 +1,4 @@
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { streamText, tool, type ModelMessage, type ToolSet } from "ai";
 import { z } from "zod";
 import type { ToolRegistry } from "../tools/contract.js";
@@ -10,9 +10,10 @@ import type {
   ToolCall,
 } from "./adapter.js";
 
-const DEFAULT_BASE_URL = "https://api.deepseek.com";
+export const OPENCODE_GO_BASE_URL = "https://opencode.ai/inference/go/openai/v1";
+export const DEFAULT_MODEL_ID = "deepseek-v4.1-flash";
 
-type DeepSeekOptions = {
+type OpenCodeGoOptions = {
   apiKey: string;
   modelId: string;
   baseUrl?: string;
@@ -66,19 +67,25 @@ function toSdkTools(tools: ToolRegistry): ToolSet {
   return sdkTools;
 }
 
-export class DeepSeekAdapter implements LLMAdapter {
+/**
+ * Adapter for OpenCode Go (OpenAI-compatible inference gateway).
+ * Default model is the same one used by this OpenCode installation:
+ * `deepseek-v4.1-flash`.
+ */
+export class OpenCodeGoAdapter implements LLMAdapter {
   private readonly model;
-  private readonly providerName = "deepseek";
+  private readonly providerName = "opencode-go";
 
-  constructor(options: DeepSeekOptions) {
+  constructor(options: OpenCodeGoOptions) {
     if (!options.apiKey) {
-      throw new Error("DEEPSEEK_API_KEY no está configurada.");
+      throw new Error("OPENCODE_API_KEY no está configurada.");
     }
-    const client = createOpenAI({
+    const client = createOpenAICompatible({
+      name: "opencode-go",
       apiKey: options.apiKey,
-      baseURL: options.baseUrl ?? DEFAULT_BASE_URL,
+      baseURL: options.baseUrl ?? OPENCODE_GO_BASE_URL,
     });
-    this.model = client.chat(options.modelId);
+    this.model = client.chatModel(options.modelId);
   }
 
   async enviar(
@@ -129,6 +136,7 @@ export class DeepSeekAdapter implements LLMAdapter {
   }
 }
 
-export function createDeepSeekAdapter(options: DeepSeekOptions): LLMAdapter {
-  return new DeepSeekAdapter(options);
+export function createOpenCodeGoAdapter(options: OpenCodeGoOptions): LLMAdapter {
+  return new OpenCodeGoAdapter(options);
 }
+

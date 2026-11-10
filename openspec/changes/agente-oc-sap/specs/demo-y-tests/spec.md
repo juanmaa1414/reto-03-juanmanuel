@@ -22,7 +22,7 @@ El archivo `demo.ts` SHALL procesar los 6 casos de prueba (sol-001 a sol-006) ll
 - **THEN** muestra las confirmaciones requeridas y simula una confirmación explícita para continuar
 
 #### Scenario: Sin API key requerida
-- **WHEN** se ejecuta demo.ts sin DEEPSEEK_API_KEY en el entorno
+- **WHEN** se ejecuta demo.ts sin OPENCODE_API_KEY en el entorno
 - **THEN** funciona correctamente sin error, procesando todos los casos
 
 ### Requirement: Tests de integración con Vitest

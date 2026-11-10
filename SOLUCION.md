@@ -64,11 +64,11 @@ Implementé un loop propio en `src/agent/loop.ts`, no el loop automático del fr
 
 ## 4. Elección del modelo
 
-- **Proveedor**: DeepSeek.
-- **Modelo**: `deepseek-flash` (configurable con `MODEL_ID`).
-- **Integración**: Vercel AI SDK (`ai`) con `@ai-sdk/openai` apuntando a `https://api.deepseek.com`, formato compatible con OpenAI.
-- **Por qué**: buena relación costo/calidad para tool calling, API compatible con OpenAI (permite reutilizar ecosistema), latencia adecuada para un chat operativo y bajo costo por caso. El adaptador permite cambiarlo sin tocar el agente.
-- **Costo estimado**: un caso típico usa ~20–30 mil tokens de entrada y ~3–5 mil de salida entre lecturas, validación, payload y evidencia. Con precios de referencia de DeepSeek, el costo es **menor a USD 0,01 por caso**; el demo y los tests no consumen tokens porque no usan LLM.
+- **Proveedor**: OpenCode Go (gateway de inferencia compatible con OpenAI).
+- **Modelo**: `deepseek-v4.1-flash` (DeepSeek V4.1 Flash), configurable con `MODEL_ID`.
+- **Integración**: Vercel AI SDK (`ai`) con `@ai-sdk/openai-compatible`, apuntando a `https://opencode.ai/inference/go/openai/v1` y autenticando con `OPENCODE_API_KEY`.
+- **Por qué**: es el mismo proveedor y modelo que usa este entorno de OpenCode, con tool calling, streaming y una API compatible con OpenAI. Eso permite mantener el ciclo del agente y las herramientas sin depender de un SDK propietario, y cambiar de modelo con una variable de entorno.
+- **Costo estimado**: un caso típico usa ~20–30 mil tokens de entrada y ~3–5 mil de salida entre lecturas, validación, payload y evidencia. Con los precios de referencia del modelo, el costo es **menor a USD 0,01 por caso**; el demo y los tests no consumen tokens porque no usan LLM.
 
 ## 5. Matriz de controles
 
@@ -207,7 +207,7 @@ Qué revisé y descarté:
 - Descarté un `fallback` de prompt embebido en el servidor: el system prompt debe vivir solo en `agent/prompt.md`.
 - Ajusté la heurística de unidad de medida para no clasificar “vigencia 12 meses” como servicio mensual.
 - Corregí la detección de confirmaciones para aceptar “sí, adelante” con acentos.
-- Revisé que ninguna respuesta ni log exponga `DEEPSEEK_API_KEY`; los tests lo verifican.
+- Revisé que ninguna respuesta ni log exponga `OPENCODE_API_KEY`; los tests lo verifican.
 - Validé cada regla RC1–RC10 contra los fixtures y agregué casos construidos para RC3, RC4, RC9 y RC10, que no tienen un fixture propio fallido.
 
 ## 12. Riesgos de producción y mitigación

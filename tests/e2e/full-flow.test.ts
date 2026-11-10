@@ -16,8 +16,8 @@ import {
 
 const config: Config = {
   port: 0,
-  modelId: "deepseek-flash",
-  deepseekApiKey: "",
+  modelId: "deepseek-v4.1-flash",
+  opencodeApiKey: "",
   maxIterations: 25,
   maxTokensPerSession: 500_000,
 };

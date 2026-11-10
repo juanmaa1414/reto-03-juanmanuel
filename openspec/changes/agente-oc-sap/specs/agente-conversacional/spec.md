@@ -29,7 +29,7 @@ El sistema SHALL pausar el turno cuando el modelo identifica una situación que 
 - **THEN** el agente aborta la creación y registra el motivo en el log de control
 
 ### Requirement: Adaptador LLM propio
-El sistema SHALL exponer una interfaz propia `enviar(mensajes, herramientas) → respuesta` que abstraiga el proveedor LLM. Cambiar de proveedor NO SHALL requerir modificar el ciclo del agente. La implementación actual SHALL usar Vercel AI SDK conectándose a DeepSeek API vía el SDK de OpenAI con `baseURL: https://api.deepseek.com` y modelo `deepseek-flash`.
+El sistema SHALL exponer una interfaz propia `enviar(mensajes, herramientas) → respuesta` que abstraiga el proveedor LLM. Cambiar de proveedor NO SHALL requerir modificar el ciclo del agente. La implementación actual SHALL usar Vercel AI SDK conectándose a OpenCode Go vía `@ai-sdk/openai-compatible` con `baseURL: https://opencode.ai/inference/go/openai/v1` y modelo `deepseek-v4.1-flash`.
 
 #### Scenario: Cambio de proveedor
 - **WHEN** se reemplaza la implementación del adaptador por otra que use Anthropic
@@ -59,7 +59,7 @@ El sistema SHALL exponer tres endpoints HTTP: `POST /api/chat` para enviar mensa
 
 #### Scenario: Health check
 - **WHEN** se consulta `GET /api/health`
-- **THEN** responde `{ ok: true, provider: "deepseek", model: "deepseek-flash" }` sin exponer la API key
+- **THEN** responde `{ ok: true, provider: "opencode-go", model: "deepseek-v4.1-flash" }` sin exponer la API key
 
 ### Requirement: System prompt en archivo separado
 El comportamiento del agente SHALL definirse en un archivo `agent/prompt.md` en formato Markdown, no embebido en código. El conocimiento del proceso SHALL vivir en `src/knowledge/ordenes-compra.md`. Un cambio de reglas de negocio NO SHALL tocar el servidor.
@@ -80,7 +80,7 @@ El sistema SHALL registrar toda llamada a herramienta en el historial visible de
 - **THEN** cada tool call (nombre, argumentos, resultado resumido) se registra como línea en `out/log.jsonl`
 
 ### Requirement: Seguridad de la API key
-La clave del modelo SHALL vivir exclusivamente en variable de entorno del backend (`DEEPSEEK_API_KEY`). La key NO SHALL aparecer en el frontend, el repositorio, los logs ni las respuestas de la API. Las herramientas NO SHALL ejecutar comandos de shell.
+La clave del modelo SHALL vivir exclusivamente en variable de entorno del backend (`OPENCODE_API_KEY`). La key NO SHALL aparecer en el frontend, el repositorio, los logs ni las respuestas de la API. Las herramientas NO SHALL ejecutar comandos de shell.
 
 #### Scenario: Frontend no recibe la key
 - **WHEN** el frontend se carga en el navegador

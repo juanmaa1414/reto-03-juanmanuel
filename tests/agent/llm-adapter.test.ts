@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, describe, expect, it } from "vitest";
-import { createDeepSeekAdapter, DeepSeekAdapter } from "../../src/llm/deepseek.js";
+import { createOpenCodeGoAdapter, OpenCodeGoAdapter } from "../../src/llm/opencode.js";
 import type { LLMAdapter } from "../../src/llm/adapter.js";
 import { ScriptedAdapter, textResponse } from "../helpers.js";
 
@@ -33,7 +33,7 @@ function startFakeOpenAI(captured: { body?: unknown }): Promise<string> {
           id: "chatcmpl-test",
           object: "chat.completion.chunk",
           created: 1_700_000_000,
-          model: "deepseek-flash",
+          model: "deepseek-v4.1-flash",
         };
         response.write(
           `data: ${JSON.stringify({
@@ -70,9 +70,9 @@ describe("LLM adapter (5.1, 5.2)", () => {
   it("sends a message and receives a response through an OpenAI-compatible endpoint", async () => {
     const captured: { body?: unknown } = {};
     const baseUrl = await startFakeOpenAI(captured);
-    const adapter = createDeepSeekAdapter({
+    const adapter = createOpenCodeGoAdapter({
       apiKey: "test-key",
-      modelId: "deepseek-flash",
+      modelId: "deepseek-v4.1-flash",
       baseUrl,
     });
 
@@ -91,7 +91,7 @@ describe("LLM adapter (5.1, 5.2)", () => {
       model?: string;
       messages?: Array<{ role: string; content: string }>;
     };
-    expect(requestBody.model).toBe("deepseek-flash");
+    expect(requestBody.model).toBe("deepseek-v4.1-flash");
     expect(requestBody.messages?.[0]).toMatchObject({ role: "user", content: "Hola" });
   });
 
@@ -102,18 +102,18 @@ describe("LLM adapter (5.1, 5.2)", () => {
     expect(response.usage.totalTokens).toBeGreaterThan(0);
   });
 
-  it("creates a DeepSeek adapter when an API key is present", () => {
-    const adapter = createDeepSeekAdapter({
+  it("creates an OpenCode Go adapter when an API key is present", () => {
+    const adapter = createOpenCodeGoAdapter({
       apiKey: "test-key-not-used",
-      modelId: "deepseek-flash",
+      modelId: "deepseek-v4.1-flash",
     });
-    expect(adapter).toBeInstanceOf(DeepSeekAdapter);
-    expect(adapter.provider).toBe("deepseek");
+    expect(adapter).toBeInstanceOf(OpenCodeGoAdapter);
+    expect(adapter.provider).toBe("opencode-go");
   });
 
-  it("refuses to build the DeepSeek adapter without an API key", () => {
+  it("refuses to build the OpenCode Go adapter without an API key", () => {
     expect(() =>
-      createDeepSeekAdapter({ apiKey: "", modelId: "deepseek-flash" }),
-    ).toThrow(/DEEPSEEK_API_KEY/);
+      createOpenCodeGoAdapter({ apiKey: "", modelId: "deepseek-v4.1-flash" }),
+    ).toThrow(/OPENCODE_API_KEY/);
   });
 });

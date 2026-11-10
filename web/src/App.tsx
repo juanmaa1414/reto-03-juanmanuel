@@ -43,7 +43,7 @@ export function App() {
             <p>SAP simulado · Periferia IT Group</p>
           </div>
         </div>
-        <span className="model-chip">DeepSeek · tools</span>
+        <span className="model-chip">OpenCode Go · deepseek-v4.1-flash</span>
       </header>
 
       <main className="layout">

@@ -2,6 +2,8 @@
 
 Agente conversacional que automatiza la preparación y creación de órdenes de compra en un SAP simulado. Lee el paquete de documentos (solicitud, cotización, aprobación y factura opcional), valida contra los maestros, construye el payload de la OC, genera la evidencia de aprobación en TXT y PDF, y crea la orden con idempotencia.
 
+**Proveedor LLM:** OpenCode Go (`https://opencode.ai/inference/go/openai/v1`) · **Modelo:** `deepseek-v4.1-flash` (DeepSeek V4.1 Flash).
+
 Proyecto del reto técnico 03 de Periferia IT Group. La solución completa está documentada en [`SOLUCION.md`](./SOLUCION.md).
 
 ## Arquitectura
@@ -11,7 +13,7 @@ Frontend React (web/)
    │  POST /api/chat (SSE) · GET /api/sessions/:id · /api/cases · /api/files/...
    ▼
 Backend Hono (src/server.ts)
-   ├── Ciclo del agente (src/agent/loop.ts) ── Adaptador LLM (src/llm/deepseek.ts)
+   ├── Ciclo del agente (src/agent/loop.ts) ── Adaptador LLM (src/llm/opencode.ts)
    ├── Herramientas zod (src/tools/oc.ts)
    ├── Adaptador SAP mock (src/sap/mock.ts)
    └── Sesiones en archivos (out/sessions/)
@@ -35,7 +37,7 @@ Backend Hono (src/server.ts)
 ## Puesta en marcha local
 
 ```bash
-cp .env.example .env          # completá DEEPSEEK_API_KEY si querés usar el chat
+cp .env.example .env          # completá OPENCODE_API_KEY si querés usar el chat
 npm install
 npm --prefix web install
 npm run dev                   # backend en http://localhost:3000
@@ -58,13 +60,13 @@ npm start                     # sirve API + web/dist en http://localhost:3000
 
 | Variable | Ejemplo | Descripción |
 |---|---|---|
-| `DEEPSEEK_API_KEY` | `sk-...` | Clave del proveedor. Solo backend; nunca en el front ni en logs. |
+| `OPENCODE_API_KEY` | `sk-...` | Clave de OpenCode Go. Solo backend; nunca en el front ni en logs. |
 | `PORT` | `3000` | Puerto HTTP del backend. |
-| `MODEL_ID` | `deepseek-flash` | Modelo de DeepSeek. |
+| `MODEL_ID` | `deepseek-v4.1-flash` | Modelo DeepSeek V4.1 Flash servido por OpenCode Go. |
 | `MAX_ITERATIONS` | `25` | Tope de iteraciones herramienta → modelo por turno. |
 | `MAX_TOKENS_PER_SESSION` | `500000` | Tope de tokens por sesión. |
 
-Sin `DEEPSEEK_API_KEY`, `/api/health` y el demo funcionan; `/api/chat` responde 503 con un mensaje claro.
+Sin `OPENCODE_API_KEY`, `/api/health` y el demo funcionan; `/api/chat` responde 503 con un mensaje claro.
 
 ## Demo sin modelo
 
@@ -159,7 +161,7 @@ El `Dockerfile` es multi-stage (dependencias → build TypeScript + Vite → run
 
 1. Creá un proyecto en Railway y conectá el repositorio.
 2. Railway detecta `railway.json` y construye con el `Dockerfile`.
-3. Configurá las variables de `/.env.example` en **Variables** (especialmente `DEEPSEEK_API_KEY`).
+3. Configurá las variables de `/.env.example` en **Variables** (especialmente `OPENCODE_API_KEY`).
 4. Verificá el healthcheck en `/api/health`.
 5. El comando de inicio es `node dist/index.js` y el puerto se toma de `PORT`.
 
@@ -194,7 +196,7 @@ console.log(validation.data.apta);
 
 ## Seguridad
 
-- `DEEPSEEK_API_KEY` vive solo en `.env` del backend (ignorado por Git y Docker).
+- `OPENCODE_API_KEY` vive solo en `.env` del backend (ignorado por Git y Docker).
 - El frontend no recibe claves; `/api/health` solo devuelve proveedor y modelo.
 - Los logs y respuestas de error se redactan si contienen la clave.
 - Las herramientas no ejecutan comandos de shell y resuelven rutas desde `ctx.directory`.

@@ -14,8 +14,8 @@ serve(
   (info) => {
     console.log(`Agente OC SAP escuchando en http://localhost:${info.port}`);
     console.log(`Modelo configurado: ${config.modelId}`);
-    if (!config.deepseekApiKey) {
-      console.log("DEEPSEEK_API_KEY vacía: /api/health funciona, /api/chat responderá 503.");
+    if (!config.opencodeApiKey) {
+      console.log("OPENCODE_API_KEY vacía: /api/health funciona, /api/chat responderá 503.");
     }
   },
 );

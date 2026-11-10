@@ -17,8 +17,8 @@ import {
 
 const config: Config = {
   port: 0,
-  modelId: "deepseek-flash",
-  deepseekApiKey: "",
+  modelId: "deepseek-v4.1-flash",
+  opencodeApiKey: "",
   maxIterations: 25,
   maxTokensPerSession: 500_000,
 };
@@ -45,7 +45,7 @@ function makeApp(adapter?: ScriptedAdapter) {
 
 describe("HTTP API (6.1, 6.2, 6.3)", () => {
   afterEach(() => {
-    delete process.env.DEEPSEEK_API_KEY;
+    delete process.env.OPENCODE_API_KEY;
   });
 
   it("reports health without exposing the API key", async () => {
@@ -53,7 +53,7 @@ describe("HTTP API (6.1, 6.2, 6.3)", () => {
     const response = await app.request("/api/health");
     expect(response.status).toBe(200);
     const body = (await response.json()) as Record<string, unknown>;
-    expect(body).toEqual({ ok: true, provider: "deepseek", model: "deepseek-flash" });
+    expect(body).toEqual({ ok: true, provider: "opencode-go", model: "deepseek-v4.1-flash" });
     expect(JSON.stringify(body)).not.toContain("apiKey");
   });
 
@@ -131,7 +131,7 @@ describe("HTTP API (6.1, 6.2, 6.3)", () => {
   });
 
   it("returns a friendly error and never leaks the API key", async () => {
-    process.env.DEEPSEEK_API_KEY = "sk-super-secret-value";
+    process.env.OPENCODE_API_KEY = "sk-super-secret-value";
     const adapter = new ScriptedAdapter([
       () => {
         throw new Error("fallo con sk-super-secret-value");
