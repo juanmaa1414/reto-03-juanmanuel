@@ -6,6 +6,7 @@ type CaseSidebarProps = {
   refreshKey: number;
   activeCase: string | null;
   onOpenCase: (sessionId: string | null) => void;
+  onNewCase: () => void;
   onClose: () => void;
 };
 
@@ -27,6 +28,7 @@ export function CaseSidebar({
   refreshKey,
   activeCase,
   onOpenCase,
+  onNewCase,
   onClose,
 }: CaseSidebarProps) {
   const [cases, setCases] = useState<CaseEntry[]>([]);
@@ -123,6 +125,14 @@ export function CaseSidebar({
           ×
         </button>
       </div>
+
+      <button
+        type="button"
+        className="new-case-button sidebar-new-case"
+        onClick={onNewCase}
+      >
+        + Nuevo caso
+      </button>
 
       {loading && <p className="sidebar-empty">Cargando casos…</p>}
       {!loading && entries.length === 0 && (

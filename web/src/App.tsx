@@ -54,9 +54,6 @@ export function App() {
           </div>
         </div>
         <div className="header-actions">
-          <button type="button" className="new-case-button" onClick={startNewCase}>
-            + Nuevo caso
-          </button>
           <span className="model-chip">OpenCode Go · deepseek-v4.1-flash</span>
         </div>
       </header>
@@ -67,6 +64,7 @@ export function App() {
             refreshKey={refreshKey}
             activeCase={activeCase}
             onOpenCase={(sessionId) => void openCase(sessionId)}
+            onNewCase={startNewCase}
             onClose={() => setSidebarOpen(false)}
           />
           {sidebarOpen && (
