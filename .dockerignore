@@ -1,0 +1,14 @@
+node_modules/
+web/node_modules/
+dist/
+web/dist/
+out/
+.env
+.git/
+.gitignore
+.opencode/
+openspec/
+tests/
+*.log
+SOLUCION.md
+PRD.md
