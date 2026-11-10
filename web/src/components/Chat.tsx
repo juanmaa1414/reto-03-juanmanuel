@@ -86,6 +86,7 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
   const [finalized, setFinalized] = useState(false);
   const [numeroOc, setNumeroOc] = useState<string | null>(null);
   const [availableCases, setAvailableCases] = useState<string[]>(ALL_CASES);
+  const [filesRefreshKey, setFilesRefreshKey] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const caseRef = useRef<string | null>(null);
 
@@ -199,7 +200,7 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
         if (event === "tool_start") {
           const payload = data as { name: string; arguments: Record<string, unknown> };
           const caso = payload.arguments.caso;
-          if (typeof caso === "string") {
+          if (typeof caso === "string" && (!boundCase || caso === boundCase)) {
             caseRef.current = caso;
             setCurrentCase(caso);
           }
@@ -232,7 +233,7 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
             result: string;
           };
           const caso = payload.arguments.caso;
-          if (typeof caso === "string") {
+          if (typeof caso === "string" && (!boundCase || caso === boundCase)) {
             caseRef.current = caso;
             setCurrentCase(caso);
           }
@@ -255,6 +256,14 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
               return { ...message, toolCalls };
             }),
           );
+          if (
+            payload.ok &&
+            ["oc_construir_payload", "oc_generar_evidencia", "oc_crear"].includes(
+              payload.name,
+            )
+          ) {
+            setFilesRefreshKey((key) => key + 1);
+          }
           return;
         }
 
@@ -317,6 +326,7 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
             setCurrentCase(doneCase);
             onCaseProcessed(doneCase);
           }
+          setFilesRefreshKey((key) => key + 1);
         }
       });
     } catch (streamError) {
@@ -450,7 +460,11 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
       )}
 
       {(boundCase || currentCase) && (
-        <FileDownload caso={(boundCase ?? currentCase) as string} />
+        <FileDownload
+          key={(boundCase ?? currentCase) as string}
+          caso={(boundCase ?? currentCase) as string}
+          refreshKey={filesRefreshKey}
+        />
       )}
 
       <form className="chat-input" onSubmit={handleSubmit}>

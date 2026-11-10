@@ -101,7 +101,9 @@ export async function fetchCases(): Promise<CaseEntry[]> {
 }
 
 export async function fetchCaseFiles(caso: string): Promise<string[]> {
-  const response = await fetch(`/api/files/${encodeURIComponent(caso)}`);
+  const response = await fetch(`/api/files/${encodeURIComponent(caso)}`, {
+    cache: "no-store",
+  });
   if (!response.ok) return [];
   const payload = (await response.json()) as {
     ok: boolean;

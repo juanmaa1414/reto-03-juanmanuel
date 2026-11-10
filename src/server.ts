@@ -274,6 +274,7 @@ export function createApp(options: AppOptions = {}): Hono {
   });
 
   app.get("/api/files/:caso", (c) => {
+    c.header("Cache-Control", "no-store");
     const caso = c.req.param("caso");
     if (caso.includes("..") || caso.includes("/") || caso.includes("\\")) {
       return c.json({ ok: false, error: "Nombre de caso inválido." }, 400);

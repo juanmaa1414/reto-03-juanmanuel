@@ -7,12 +7,17 @@ const CASE_FILES: Record<string, string> = {
   "aprobacion.pdf": "Aprobación (PDF)",
 };
 
-export function FileDownload({ caso }: { caso: string }) {
+export function FileDownload({
+  caso,
+  refreshKey,
+}: {
+  caso: string;
+  refreshKey: number;
+}) {
   const [files, setFiles] = useState<string[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setFiles(null);
     void fetchCaseFiles(caso)
       .then((available) => {
         if (!cancelled) setFiles(available);
@@ -23,7 +28,7 @@ export function FileDownload({ caso }: { caso: string }) {
     return () => {
       cancelled = true;
     };
-  }, [caso]);
+  }, [caso, refreshKey]);
 
   const available = (files ?? []).filter((file) => file in CASE_FILES);
 
