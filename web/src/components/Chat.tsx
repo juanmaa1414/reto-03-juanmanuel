@@ -14,6 +14,7 @@ import type {
 } from "../types";
 import { Confirmation } from "./Confirmation";
 import { FileDownload } from "./FileDownload";
+import { Markdown } from "./Markdown";
 
 const SESSION_KEY = "agente-oc-sap-session-id";
 
@@ -294,13 +295,13 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
           <div className="empty-state">
             <h2>Agente de órdenes de compra SAP</h2>
             <p>
-              Pedile que procese un caso. El agente lee el paquete, valida contra los
+              Pídele que procese un caso. El agente lee el paquete, valida contra los
               maestros, arma la OC y pide confirmación cuando hace falta.
             </p>
             <div className="suggestions">
               {["sol-001", "sol-002", "sol-004", "sol-005"].map((caso) => (
-                <button key={caso} type="button" onClick={() => void send(`Procesá ${caso}`)}>
-                  Procesá {caso}
+                <button key={caso} type="button" onClick={() => void send(`Procesa ${caso}`)}>
+                  Procesa {caso}
                 </button>
               ))}
             </div>
@@ -312,7 +313,12 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
             <header>
               {message.role === "user" ? "Analista" : "Agente"}
             </header>
-            {message.content && <div className="message-content">{message.content}</div>}
+            {message.content &&
+              (message.role === "assistant" ? (
+                <Markdown>{message.content}</Markdown>
+              ) : (
+                <div className="message-content">{message.content}</div>
+              ))}
             {message.toolCalls && message.toolCalls.length > 0 && (
               <div className="tool-calls">
                 {message.toolCalls.map((call) => (
@@ -363,8 +369,8 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
           }}
           placeholder={
             confirmation?.needsConfirmation
-              ? "Escribí 'confirmo' o usá los botones de arriba…"
-              : "Ej.: Procesá la solicitud sol-004 y mostrame la OC antes de crearla"
+              ? "Escribe 'confirmo' o usa los botones de arriba…"
+              : "Ej.: Procesa la solicitud sol-004 y muéstrame la OC antes de crearla"
           }
           rows={2}
           disabled={busy}

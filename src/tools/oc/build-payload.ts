@@ -84,7 +84,7 @@ export const construir_payload = defineTool({
 
     if (!sapCode) {
       return fail(
-        `No se pudo resolver el código SAP del proveedor "${solicitud.proveedor_nombre}". Ejecutá oc_validar primero.`,
+        `No se pudo resolver el código SAP del proveedor "${solicitud.proveedor_nombre}". Ejecuta oc_validar primero.`,
       );
     }
     if (!supplierNit) {

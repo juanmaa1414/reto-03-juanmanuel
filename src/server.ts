@@ -243,7 +243,7 @@ export function createApp(options: AppOptions = {}): Hono {
         {
           ok: false,
           error:
-            "OPENCODE_API_KEY no está configurada en el backend. Configurala en .env para usar el chat; el demo y los tests no la necesitan.",
+            "OPENCODE_API_KEY no está configurada en el backend. Configúrala en .env para usar el chat; el demo y los tests no la necesitan.",
         },
         503,
       );

@@ -37,7 +37,7 @@ Backend Hono (src/server.ts)
 ## Puesta en marcha local
 
 ```bash
-cp .env.example .env          # completá OPENCODE_API_KEY si querés usar el chat
+cp .env.example .env          # completa OPENCODE_API_KEY si quieres usar el chat
 npm install
 npm --prefix web install
 npm run dev                   # backend en http://localhost:3000
@@ -145,7 +145,7 @@ Ejemplo:
 ```bash
 curl -X POST http://localhost:3000/api/chat \
   -H 'Content-Type: application/json' \
-  -d '{"message":"Procesá sol-001","stream":false}'
+  -d '{"message":"Procesa sol-001","stream":false}'
 ```
 
 ## Docker
@@ -159,10 +159,10 @@ El `Dockerfile` es multi-stage (dependencias → build TypeScript + Vite → run
 
 ## Deploy en Railway
 
-1. Creá un proyecto en Railway y conectá el repositorio.
+1. Crea un proyecto en Railway y conecta el repositorio.
 2. Railway detecta `railway.json` y construye con el `Dockerfile`.
-3. Configurá las variables de `/.env.example` en **Variables** (especialmente `OPENCODE_API_KEY`).
-4. Verificá el healthcheck en `/api/health`.
+3. Configura las variables de `/.env.example` en **Variables** (especialmente `OPENCODE_API_KEY`).
+4. Verifica el healthcheck en `/api/health`.
 5. El comando de inicio es `node dist/index.js` y el puerto se toma de `PORT`.
 
 Link de prueba: **_(completar con la URL pública al desplegar)_**.

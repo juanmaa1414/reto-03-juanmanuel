@@ -17,7 +17,7 @@ export function Confirmation({
     <section className="confirmation-card" role="alert" aria-live="assertive">
       <div className="confirmation-heading">
         <span className="confirmation-icon">⚠</span>
-        <h3>Se requiere tu confirmación</h3>
+        <h3>Confirmación requerida</h3>
       </div>
       <p>{message}</p>
       {pending.length > 0 && (

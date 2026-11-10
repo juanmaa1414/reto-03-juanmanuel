@@ -80,7 +80,7 @@ export function CaseSidebar({
       {loading && <p className="sidebar-empty">Cargando casos…</p>}
       {!loading && entries.length === 0 && (
         <p className="sidebar-empty">
-          Todavía no hay casos procesados. Probá con <strong>sol-001</strong>.
+          Aún no hay casos procesados. Prueba con <strong>sol-001</strong>.
         </p>
       )}
 

@@ -157,7 +157,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
         stage: "llm",
       });
       emit({ type: "error", error: message });
-      finalText = `No pude comunicarme con el proveedor del modelo: ${message}. La sesión sigue activa; podés reintentar.`;
+      finalText = `No pude comunicarme con el proveedor del modelo: ${message}. La sesión sigue activa; puedes reintentar.`;
       history.push({ role: "assistant", content: finalText });
       return finish();
     }
@@ -252,14 +252,14 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     if (usage.totalTokens > maxTokensPerSession) {
       finalText =
         "Alcancé el tope de tokens configurado para la sesión. " +
-        "Esto es lo procesado hasta ahora; revisá el historial y continuá en una sesión nueva.";
+        "Esto es lo procesado hasta ahora; revisa el historial y continúa en una sesión nueva.";
       return finish();
     }
   }
 
   finalText =
     `Alcancé el tope de ${maxIterations} iteraciones sin una respuesta final. ` +
-    "Revisá el historial de herramientas para ver lo procesado y lo pendiente.";
+    "Revisa el historial de herramientas para ver lo procesado y lo pendiente.";
   emit({ type: "error", error: finalText });
   return finish();
 }

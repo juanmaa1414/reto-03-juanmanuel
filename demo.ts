@@ -136,7 +136,7 @@ async function main(): Promise<void> {
   }
 
   await processCase("sol-001", "sol-001 (segunda ejecución: idempotencia)");
-  console.log("\nDemo completado. Revisá out/control.csv y out/sap/ordenes.jsonl.");
+  console.log("\nDemo completado. Revisa out/control.csv y out/sap/ordenes.jsonl.");
 }
 
 void main().catch((error) => {

@@ -28,7 +28,7 @@ export async function readPackage(
   if (!existsSync(caseDir)) {
     return {
       ok: false,
-      error: `El caso "${caso}" no existe en fixtures/reto-03/solicitudes/. Verificá el nombre de la carpeta.`,
+      error: `El caso "${caso}" no existe en fixtures/reto-03/solicitudes/. Verifica el nombre de la carpeta.`,
     };
   }
 
