@@ -145,6 +145,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
     try {
       response = await adapter.enviar(history, tools, {
         system: systemPrompt,
+        sessionId: context.sessionId,
         onTextDelta: (delta) => emit({ type: "text", delta }),
       });
     } catch (error) {

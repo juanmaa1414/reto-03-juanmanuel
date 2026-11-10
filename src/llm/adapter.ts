@@ -31,6 +31,7 @@ export type LLMResponse = {
 
 export type LLMRequestOptions = {
   system?: string;
+  sessionId?: string;
   onTextDelta?: (delta: string) => void;
 };
 

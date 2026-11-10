@@ -11,7 +11,7 @@ afterAll(() => {
   fakeServer?.close();
 });
 
-function startFakeOpenAI(captured: { body?: unknown }): Promise<string> {
+function startFakeOpenAI(captured: { body?: unknown; headers?: Record<string, string | string[] | undefined> }): Promise<string> {
   return new Promise((resolvePort, reject) => {
     fakeServer = createServer((request, response) => {
       let raw = "";
@@ -19,6 +19,7 @@ function startFakeOpenAI(captured: { body?: unknown }): Promise<string> {
         raw += String(chunk);
       });
       request.on("end", () => {
+        captured.headers = request.headers;
         try {
           captured.body = JSON.parse(raw);
         } catch {
@@ -68,7 +69,7 @@ function startFakeOpenAI(captured: { body?: unknown }): Promise<string> {
 
 describe("LLM adapter (5.1, 5.2)", () => {
   it("sends a message and receives a response through an OpenAI-compatible endpoint", async () => {
-    const captured: { body?: unknown } = {};
+    const captured: { body?: unknown; headers?: Record<string, string | string[] | undefined> } = {};
     const baseUrl = await startFakeOpenAI(captured);
     const adapter = createOpenCodeGoAdapter({
       apiKey: "test-key",
@@ -80,7 +81,7 @@ describe("LLM adapter (5.1, 5.2)", () => {
     const response = await adapter.enviar(
       [{ role: "user", content: "Hola" }],
       {},
-      { onTextDelta: (delta) => deltas.push(delta) },
+      { sessionId: "session-test", onTextDelta: (delta) => deltas.push(delta) },
     );
 
     expect(response.text).toBe("Hola mundo");
@@ -93,6 +94,8 @@ describe("LLM adapter (5.1, 5.2)", () => {
     };
     expect(requestBody.model).toBe("deepseek-v4.1-flash");
     expect(requestBody.messages?.[0]).toMatchObject({ role: "user", content: "Hola" });
+    expect(captured.headers?.["x-opencode-session"]).toBe("session-test");
+    expect(captured.headers?.["user-agent"]).toContain("agente-oc-sap");
   });
 
   it("implements the LLMAdapter interface with a mock provider", async () => {

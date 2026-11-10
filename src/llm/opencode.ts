@@ -99,6 +99,10 @@ export class OpenCodeGoAdapter implements LLMAdapter {
       messages: toModelMessages(messages),
       tools: toSdkTools(tools),
       temperature: 0,
+      headers: {
+        "User-Agent": "agente-oc-sap/1.0",
+        "x-opencode-session": options.sessionId ?? "agente-oc-sap",
+      },
     });
 
     for await (const delta of result.textStream) {
