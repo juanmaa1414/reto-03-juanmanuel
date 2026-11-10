@@ -16,8 +16,7 @@ import type {
 import { Confirmation } from "./Confirmation";
 import { FileDownload } from "./FileDownload";
 import { Markdown } from "./Markdown";
-
-export const SESSION_STORAGE_KEY = "agente-oc-sap-session-id";
+import { SESSION_STORAGE_KEY } from "../session";
 
 const ALL_CASES = ["sol-001", "sol-002", "sol-003", "sol-004", "sol-005", "sol-006"];
 
@@ -89,6 +88,13 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
   const [filesRefreshKey, setFilesRefreshKey] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const caseRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const applySession = (session: SessionData): void => {
     const chatMessages = toChatMessages(session.messages);
@@ -174,6 +180,8 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
     ]);
 
     let activeSession = sessionId;
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       await streamChat(activeSession, text, (event, data) => {
@@ -328,8 +336,9 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
           }
           setFilesRefreshKey((key) => key + 1);
         }
-      });
+      }, controller.signal);
     } catch (streamError) {
+      if (controller.signal.aborted) return;
       const detail = streamError instanceof Error ? streamError.message : String(streamError);
       setError(detail);
       setMessages((previous) =>
@@ -340,6 +349,7 @@ export function Chat({ initialSession, onCaseProcessed }: ChatProps) {
         ),
       );
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       setBusy(false);
     }
   };

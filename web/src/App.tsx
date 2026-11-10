@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { fetchSession } from "./api";
 import { CaseSidebar } from "./components/CaseSidebar";
-import { Chat, SESSION_STORAGE_KEY } from "./components/Chat";
+import { Chat } from "./components/Chat";
+import { SESSION_STORAGE_KEY } from "./session";
 import type { SessionData } from "./types";
 
 export function App() {

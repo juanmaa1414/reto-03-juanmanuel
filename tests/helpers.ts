@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import type {
   AgentMessage,
   LLMAdapter,
@@ -10,7 +9,7 @@ import type {
 import type { ToolRegistry } from "../src/tools/contract.js";
 import type { PurchaseOrder } from "../src/types.js";
 
-export const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+export const repoRoot = process.cwd();
 export const testContext = { directory: repoRoot, sessionId: "test-session" };
 
 export function outPath(...parts: string[]): string {

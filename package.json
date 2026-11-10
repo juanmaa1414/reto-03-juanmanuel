@@ -24,9 +24,12 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "jsdom": "^31.0.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
